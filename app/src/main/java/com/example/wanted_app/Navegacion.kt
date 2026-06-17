@@ -1,9 +1,6 @@
 package com.example.wanted_app
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -13,7 +10,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -36,6 +32,11 @@ fun AppPrincipal() {
         val navController = rememberNavController()
         val viewModel: ProductosViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 
+        // Ruta actual: la usamos para ocultar la barra inferior en login y registro.
+        val navBackStackEntry by navController.currentBackStackEntryAsState()
+        val rutaActual = navBackStackEntry?.destination?.route
+        val mostrarBarra = rutaActual != "login" && rutaActual != "registro"
+
         val botonesBarra = listOf(
             BotonBarra(Icons.Default.Home, "inicio"),
             BotonBarra(Icons.Default.Person, "perfil"),
@@ -47,28 +48,31 @@ fun AppPrincipal() {
 
         Scaffold(
             bottomBar = {
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.navigationBarsPadding() // Mantiene a salvo la barra del sistema
+                // La barra inferior NO se muestra en login ni en registro.
+                if (mostrarBarra) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        HorizontalDivider(thickness = 0.6.dp)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                // Aquí está la magia:
-                                // top y bottom pequeños = barra menos alta
-                                // end pequeño = elementos más pegados a la derecha
-                                .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
-                            horizontalArrangement = Arrangement.End, // Mantiene los elementos a la derecha
-                            verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            modifier = Modifier.navigationBarsPadding()
                         ) {
-                            botonesBarra.forEachIndexed { index, boton ->
-                                // Tus botones aquí
-                                IconButton(onClick = { navController.navigate(boton.ruta) }) {
-                                    Icon(imageVector = boton.icono, contentDescription = null)
+                            HorizontalDivider(thickness = 0.6.dp)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, top = 6.dp, bottom = 6.dp),
+                                // Botones centrados en el medio, con separación uniforme.
+                                // (Para repartirlos por todo el ancho: Arrangement.SpaceEvenly.)
+                                horizontalArrangement = Arrangement.spacedBy(
+                                    8.dp, Alignment.CenterHorizontally
+                                ),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                botonesBarra.forEach { boton ->
+                                    IconButton(onClick = { navController.navigate(boton.ruta) }) {
+                                        Icon(imageVector = boton.icono, contentDescription = null)
+                                    }
                                 }
                             }
                         }
@@ -78,16 +82,37 @@ fun AppPrincipal() {
         ) { innerPadding ->
             NavHost(
                 navController = navController,
-                startDestination = Pantalla.Inicio.ruta,
+                startDestination = "login",
                 modifier = Modifier.padding(innerPadding)
             ) {
+                composable("login") {
+                    PantallaLogin(
+                        onLoginExitoso = {
+                            navController.navigate(Pantalla.Inicio.ruta) {
+                                popUpTo("login") { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        },
+                        onIrARegistro = { navController.navigate("registro") }
+                    )
+                }
+                composable("registro") {
+                    PantallaRegistro(
+                        onRegistroExitoso = {
+                            // Tras registrarse, entra a la app y limpia login + registro de la pila.
+                            navController.navigate(Pantalla.Inicio.ruta) {
+                                popUpTo("login") { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        },
+                        onVolverALogin = { navController.popBackStack() }
+                    )
+                }
                 composable(Pantalla.Inicio.ruta) {
                     PantallaInicio(
                         onNavegar = { ruta ->
                             navController.navigate(ruta) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
+                                popUpTo(Pantalla.Inicio.ruta) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
                             }
