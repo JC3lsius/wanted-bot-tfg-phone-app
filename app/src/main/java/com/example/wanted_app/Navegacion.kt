@@ -61,7 +61,7 @@ fun AppPrincipal() {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, top = 6.dp, bottom = 6.dp),
+                                    .padding(horizontal = 16.dp, vertical = 6.dp),
                                 // Botones centrados en el medio, con separación uniforme.
                                 // (Para repartirlos por todo el ancho: Arrangement.SpaceEvenly.)
                                 horizontalArrangement = Arrangement.spacedBy(
