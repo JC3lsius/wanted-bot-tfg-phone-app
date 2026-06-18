@@ -26,7 +26,7 @@ data class ProductoDto(
     @SerializedName("imagen_url") val imagenUrl: String = "",
     val enlace: String = "",
     val busqueda: String = "",
-    @SerializedName("busqueda_id") val busquedaId: Int = 0,
+    @SerializedName("busqueda_id") val busquedaId: Int? = null,
     val imagenes: List<String> = emptyList(),
     @SerializedName("fecha_detectado") val fechaDetectado: String? = null,
     val favorito: Boolean = false,
@@ -62,6 +62,9 @@ data class BusquedaDto(
     @SerializedName("estado_articulo") val estadoArticulo: String = "",
     val ubicacion: String = "",
     val categoria: String = "",
+    val tipo: String = "listener",
+    val profundidad: Int = 1,
+    @SerializedName("limite_productos") val limiteProductos: Int = 0,
     val activa: Boolean = false,
     @SerializedName("estado_hilo") val estadoHilo: String = "detenido"
 )
@@ -76,7 +79,10 @@ data class BusquedaCrearRequest(
     @SerializedName("precio_max") val precioMax: Double = 99999.0,
     @SerializedName("estado_articulo") val estadoArticulo: String = "",
     val ubicacion: String = "",
-    val categoria: String = ""
+    val categoria: String = "",
+    val tipo: String = "listener",
+    val profundidad: Int = 1,
+    @SerializedName("limite_productos") val limiteProductos: Int = 0
 )
 
 // =====================================================================
@@ -90,6 +96,7 @@ interface ApiService {
         @Query("plataforma") plataforma: String? = null,
         @Query("busqueda") busqueda: String? = null,
         @Query("solo_favoritos") soloFavoritos: Boolean = false,
+        @Query("pagina") pagina: Int = 1,
         @Query("limite") limite: Int = 50
     ): List<ProductoDto>
 
@@ -124,6 +131,12 @@ interface ApiService {
 
     @DELETE("busquedas/{id}")
     suspend fun borrarBusqueda(@Path("id") id: Int): MensajeResponse
+
+    @DELETE("productos")
+    suspend fun borrarProductos(
+        @Query("busqueda") busqueda: String? = null,
+        @Query("busqueda_id") busquedaId: Int? = null
+    ): MensajeResponse
 }
 
 // =====================================================================

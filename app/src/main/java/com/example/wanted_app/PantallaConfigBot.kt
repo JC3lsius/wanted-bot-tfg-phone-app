@@ -36,6 +36,10 @@ fun PantallaConfigBot() {
     var excluidas by remember { mutableStateOf(listOf<String>()) }
     var precioMin by remember { mutableStateOf("") }
     var precioMax by remember { mutableStateOf("") }
+    var tipo by remember { mutableStateOf("listener") }
+    var profundidad by remember { mutableStateOf(1) }
+    var limiteProductos by remember { mutableStateOf(0) }
+    var busquedaLimpiar by remember { mutableStateOf<BusquedaDto?>(null) }
     var guardando by remember { mutableStateOf(false) }
 
     val plataformasDisponibles = listOf("Vinted", "Wallapop", "eBay", "Milanuncios")
@@ -55,6 +59,29 @@ fun PantallaConfigBot() {
     }
 
     LaunchedEffect(Unit) { recargar() }
+
+    busquedaLimpiar?.let { objetivo ->
+        AlertDialog(
+            onDismissRequest = { busquedaLimpiar = null },
+            title = { Text("Vaciar productos") },
+            text = { Text("Se eliminarán todos los productos de \"${objetivo.nombre}\". La búsqueda seguirá activa.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    busquedaLimpiar = null
+                    scope.launch {
+                        try {
+                            RetrofitCliente.api.borrarProductos(busqueda = objetivo.nombre)
+                        } catch (e: Exception) {
+                            error = "No se pudieron borrar los productos: ${e.message}"
+                        }
+                    }
+                }) { Text("Vaciar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { busquedaLimpiar = null }) { Text("Cancelar") }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -139,6 +166,70 @@ fun PantallaConfigBot() {
                 }
 
                 Spacer(Modifier.height(14.dp))
+                Text("Tipo de búsqueda", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(6.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = tipo == "listener",
+                        onClick = { tipo = "listener" },
+                        label = { Text("Listener", fontSize = 12.sp) }
+                    )
+                    FilterChip(
+                        selected = tipo == "once",
+                        onClick = { tipo = "once" },
+                        label = { Text("Una vez", fontSize = 12.sp) }
+                    )
+                }
+                Text(
+                    if (tipo == "once") "Hace un barrido y se detiene."
+                    else "Sigue vigilando y avisa de lo nuevo.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(10.dp))
+                Text("Profundidad (páginas por barrido)", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(6.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = profundidad == 1,
+                        onClick = { profundidad = 1 },
+                        label = { Text("1 página", fontSize = 12.sp) }
+                    )
+                    FilterChip(
+                        selected = profundidad == 5,
+                        onClick = { profundidad = 5 },
+                        label = { Text("5 páginas", fontSize = 12.sp) }
+                    )
+                    FilterChip(
+                        selected = profundidad == 0,
+                        onClick = { profundidad = 0 },
+                        label = { Text("Sin límite", fontSize = 12.sp) }
+                    )
+                }
+
+                Spacer(Modifier.height(10.dp))
+                Text("Límite de productos por escaneo", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(6.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = limiteProductos == 0,
+                        onClick = { limiteProductos = 0 },
+                        label = { Text("Sin tope", fontSize = 12.sp) }
+                    )
+                    FilterChip(
+                        selected = limiteProductos == 50,
+                        onClick = { limiteProductos = 50 },
+                        label = { Text("50", fontSize = 12.sp) }
+                    )
+                    FilterChip(
+                        selected = limiteProductos == 100,
+                        onClick = { limiteProductos = 100 },
+                        label = { Text("100", fontSize = 12.sp) }
+                    )
+                }
+
+                Spacer(Modifier.height(14.dp))
                 Button(
                     onClick = {
                         guardando = true
@@ -152,7 +243,10 @@ fun PantallaConfigBot() {
                                         palabrasIncluidas = incluidas,
                                         palabrasExcluidas = excluidas,
                                         precioMin = precioMin.toDoubleOrNull() ?: 0.0,
-                                        precioMax = precioMax.toDoubleOrNull() ?: 99999.0
+                                        precioMax = precioMax.toDoubleOrNull() ?: 99999.0,
+                                        tipo = tipo,
+                                        profundidad = profundidad,
+                                        limiteProductos = limiteProductos
                                     )
                                 )
                                 // limpiar formulario
@@ -162,6 +256,9 @@ fun PantallaConfigBot() {
                                 excluidas = emptyList()
                                 precioMin = ""
                                 precioMax = ""
+                                tipo = "listener"
+                                profundidad = 1
+                                limiteProductos = 0
                                 recargar()
                             } catch (e: Exception) {
                                 error = "No se pudo crear la búsqueda: ${e.message}"
@@ -241,6 +338,10 @@ fun PantallaConfigBot() {
                                 }
                             }) {
                                 Text(if (b.activa) "Parar" else "Iniciar", fontSize = 13.sp)
+                            }
+
+                            TextButton(onClick = { busquedaLimpiar = b }) {
+                                Text("Vaciar", fontSize = 13.sp)
                             }
 
                             IconButton(onClick = {

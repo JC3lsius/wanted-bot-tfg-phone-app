@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,8 +34,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.lazy.rememberLazyListState
 import coil.compose.AsyncImage
-import kotlinx.coroutines.delay
 import com.example.wanted_app.ui.theme.*
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -64,14 +65,10 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
     var soloFavoritos by remember { mutableStateOf(false) }
     var ordenCampo by remember { mutableStateOf("fecha") }   // "fecha" o "precio"
     var ordenAsc by remember { mutableStateOf(false) }       // false = descendente
+    var mostrarConfirmarBorrado by remember { mutableStateOf(false) }
 
-    // Recarga al entrar y luego cada 8 s, para ver en "tiempo real" lo que va llegando.
-    LaunchedEffect(Unit) {
-        while (true) {
-            viewModel.cargarProductos()
-            delay(8000)
-        }
-    }
+    // Recarga la primera página al entrar a la pantalla (p. ej. tras crear una búsqueda).
+    LaunchedEffect(Unit) { viewModel.cargarProductos() }
 
     val productosList = viewModel.productos
 
@@ -93,6 +90,36 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
             if (ordenAsc) ordenada else ordenada.reversed()
         }
 
+    val listState = rememberLazyListState()
+    // Cuando el usuario se acerca al final de la lista, pedimos la siguiente página.
+    val cargarMasAhora by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val ultimo = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+            info.totalItemsCount > 0 && ultimo >= info.totalItemsCount - 3
+        }
+    }
+    LaunchedEffect(cargarMasAhora) {
+        if (cargarMasAhora) viewModel.cargarMas()
+    }
+
+    if (mostrarConfirmarBorrado) {
+        AlertDialog(
+            onDismissRequest = { mostrarConfirmarBorrado = false },
+            title = { Text("Borrar todos los productos") },
+            text = { Text("Se eliminarán todos los productos detectados. Esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    mostrarConfirmarBorrado = false
+                    viewModel.borrarTodos()
+                }) { Text("Borrar todo") }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarConfirmarBorrado = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         // Header
         Row(
@@ -103,12 +130,21 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Productos", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            IconButton(onClick = { vistaCompacta = !vistaCompacta }) {
-                Icon(
-                    if (vistaCompacta) Icons.Default.List else Icons.Default.Menu,
-                    contentDescription = "Cambiar vista",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { mostrarConfirmarBorrado = true }) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Borrar todos los productos",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = { vistaCompacta = !vistaCompacta }) {
+                    Icon(
+                        if (vistaCompacta) Icons.Default.List else Icons.Default.Menu,
+                        contentDescription = "Cambiar vista",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
 
@@ -268,6 +304,7 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
 
                 // Lista
                 LazyColumn(
+                    state = listState,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(if (vistaCompacta) 4.dp else 10.dp),
                     modifier = Modifier.animateContentSize()
@@ -285,6 +322,17 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
                                 onDescartar = { viewModel.descartar(producto.id) },
                                 onFavorito = { viewModel.toggleFavorito(producto.id) }
                             )
+                        }
+                    }
+
+                    if (viewModel.cargandoMas) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) { CircularProgressIndicator() }
                         }
                     }
                 }
