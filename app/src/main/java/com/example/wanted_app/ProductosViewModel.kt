@@ -32,7 +32,7 @@ class ProductosViewModel : ViewModel() {
             cargando = true
             error = null
             try {
-                val lista = RetrofitCliente.api.getProductos()
+                val lista = RetrofitCliente.api.getProductos(limite = 200)
                 _productos.clear()
                 _productos.addAll(lista.map { it.aProducto() })
             } catch (e: Exception) {

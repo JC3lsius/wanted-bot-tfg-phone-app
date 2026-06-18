@@ -19,6 +19,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 @Composable
 fun PantallaLogin(
@@ -29,6 +30,9 @@ fun PantallaLogin(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var cargando by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -37,7 +41,7 @@ fun PantallaLogin(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Logo / avatar (mismo estilo que PantallaInicio)
+        // Logo / avatar
         Box(
             modifier = Modifier
                 .size(72.dp)
@@ -69,6 +73,7 @@ fun PantallaLogin(
             label = { Text("Correo electrónico") },
             leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
             singleLine = true,
+            enabled = !cargando,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             modifier = Modifier.fillMaxWidth()
         )
@@ -82,11 +87,12 @@ fun PantallaLogin(
             label = { Text("Contraseña") },
             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
             singleLine = true,
+            enabled = !cargando,
             visualTransformation = if (passwordVisible) VisualTransformation.None
             else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             trailingIcon = {
-                TextButton(onClick = { passwordVisible = !passwordVisible }) {
+                TextButton(onClick = { passwordVisible = !passwordVisible }, enabled = !cargando) {
                     Text(if (passwordVisible) "Ocultar" else "Ver")
                 }
             },
@@ -100,25 +106,53 @@ fun PantallaLogin(
 
         Spacer(Modifier.height(24.dp))
 
-        // Botón iniciar sesión
+        // Botón iniciar sesión (con spinner mientras carga)
         Button(
             onClick = {
+                error = null
                 if (email.isBlank() || password.isBlank()) {
                     error = "Introduce tu correo y contraseña"
                 } else {
-                    // TODO: aquí irá la autenticación real contra el backend:
-                    //   POST /login (Retrofit) -> recibir el JWT -> guardarlo
-                    //   -> y SOLO si la respuesta es correcta, llamar a onLoginExitoso().
-                    // De momento es un login de solo interfaz para probar la navegación.
-                    onLoginExitoso()
+                    cargando = true
+                    scope.launch {
+                        try {
+                            val resp = RetrofitCliente.api.login(
+                                LoginRequest(email.trim(), password)
+                            )
+                            Sesion.guardar(resp)
+                            onLoginExitoso()
+                        } catch (e: retrofit2.HttpException) {
+                            error = if (e.code() == 401) "Correo o contraseña incorrectos"
+                            else "Error del servidor (${e.code()})"
+                        } catch (e: java.io.InterruptedIOException) {
+                            // timeout (callTimeout / read / connect agotado)
+                            error = "El servidor tardó demasiado en responder. Inténtalo de nuevo."
+                        } catch (e: java.io.IOException) {
+                            // sin conexión / backend apagado / connection refused
+                            error = "No se pudo conectar con el servidor. ¿Está encendido?"
+                        } catch (e: Exception) {
+                            error = "Error inesperado: ${e.message}"
+                        } finally {
+                            cargando = false
+                        }
+                    }
                 }
             },
+            enabled = !cargando,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Text("Iniciar sesión", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            if (cargando) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Text("Iniciar sesión", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            }
         }
 
         Spacer(Modifier.height(8.dp))
@@ -129,7 +163,7 @@ fun PantallaLogin(
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            TextButton(onClick = onIrARegistro) {
+            TextButton(onClick = onIrARegistro, enabled = !cargando) {
                 Text("Regístrate", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
         }

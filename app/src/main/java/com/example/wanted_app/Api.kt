@@ -1,14 +1,17 @@
 package com.example.wanted_app
 
 import com.google.gson.annotations.SerializedName
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
+import java.util.concurrent.TimeUnit
 
 // =====================================================================
 //  DTOs — lo que viaja por la red (nombres EXACTOS del JSON del backend)
@@ -31,6 +34,14 @@ data class ProductoDto(
     val comprado: Boolean = false
 )
 
+// Respuesta de GET /stats
+data class StatsDto(
+    @SerializedName("total_productos") val totalProductos: Int = 0,
+    @SerializedName("total_favoritos") val totalFavoritos: Int = 0,
+    @SerializedName("total_comprados") val totalComprados: Int = 0,
+    @SerializedName("total_busquedas") val totalBusquedas: Int = 0
+)
+
 // Auth
 data class LoginRequest(val email: String, val password: String)
 data class RegistroRequest(val email: String, val nombre: String, val password: String)
@@ -38,6 +49,35 @@ data class TokenResponse(val token: String, val nombre: String, val email: Strin
 
 // Respuesta genérica
 data class MensajeResponse(val mensaje: String, val exito: Boolean = true)
+
+// Búsqueda (respuesta de GET/POST /busquedas)
+data class BusquedaDto(
+    val id: Int,
+    val nombre: String,
+    val plataformas: List<String> = emptyList(),
+    @SerializedName("palabras_incluidas") val palabrasIncluidas: List<String> = emptyList(),
+    @SerializedName("palabras_excluidas") val palabrasExcluidas: List<String> = emptyList(),
+    @SerializedName("precio_min") val precioMin: Double = 0.0,
+    @SerializedName("precio_max") val precioMax: Double = 0.0,
+    @SerializedName("estado_articulo") val estadoArticulo: String = "",
+    val ubicacion: String = "",
+    val categoria: String = "",
+    val activa: Boolean = false,
+    @SerializedName("estado_hilo") val estadoHilo: String = "detenido"
+)
+
+// Cuerpo de POST /busquedas
+data class BusquedaCrearRequest(
+    val nombre: String,
+    val plataformas: List<String> = emptyList(),
+    @SerializedName("palabras_incluidas") val palabrasIncluidas: List<String> = emptyList(),
+    @SerializedName("palabras_excluidas") val palabrasExcluidas: List<String> = emptyList(),
+    @SerializedName("precio_min") val precioMin: Double = 0.0,
+    @SerializedName("precio_max") val precioMax: Double = 99999.0,
+    @SerializedName("estado_articulo") val estadoArticulo: String = "",
+    val ubicacion: String = "",
+    val categoria: String = ""
+)
 
 // =====================================================================
 //  Endpoints
@@ -53,6 +93,9 @@ interface ApiService {
         @Query("limite") limite: Int = 50
     ): List<ProductoDto>
 
+    @GET("stats")
+    suspend fun getStats(): StatsDto
+
     @PUT("productos/{id}/favorito")
     suspend fun toggleFavorito(@Path("id") id: String): MensajeResponse
 
@@ -64,10 +107,49 @@ interface ApiService {
 
     @POST("auth/registro")
     suspend fun registro(@Body datos: RegistroRequest): TokenResponse
+
+    // --- Búsquedas (Configuración del Bot) ---
+
+    @GET("busquedas")
+    suspend fun getBusquedas(): List<BusquedaDto>
+
+    @POST("busquedas")
+    suspend fun crearBusqueda(@Body datos: BusquedaCrearRequest): BusquedaDto
+
+    @POST("busquedas/{id}/iniciar")
+    suspend fun iniciarBusqueda(@Path("id") id: Int): MensajeResponse
+
+    @POST("busquedas/{id}/parar")
+    suspend fun pararBusqueda(@Path("id") id: Int): MensajeResponse
+
+    @DELETE("busquedas/{id}")
+    suspend fun borrarBusqueda(@Path("id") id: Int): MensajeResponse
 }
 
 // =====================================================================
-//  Cliente Retrofit
+//  Sesión en memoria — guarda el token tras iniciar sesión
+// =====================================================================
+
+object Sesion {
+    var token: String? = null
+    var nombre: String? = null
+    var email: String? = null
+
+    fun guardar(t: TokenResponse) {
+        token = t.token
+        nombre = t.nombre
+        email = t.email
+    }
+
+    fun cerrar() {
+        token = null
+        nombre = null
+        email = null
+    }
+}
+
+// =====================================================================
+//  Cliente Retrofit (con timeouts para que NUNCA se quede colgado)
 // =====================================================================
 
 object RetrofitCliente {
@@ -77,9 +159,16 @@ object RetrofitCliente {
     // por ejemplo: "http://192.168.1.40:8000/"  (y el móvil en el mismo Wi-Fi).
     private const val BASE_URL = "http://10.0.2.2:8000/"
 
+    private val cliente = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .callTimeout(15, TimeUnit.SECONDS)
+        .build()
+
     val api: ApiService by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
+            .client(cliente)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(ApiService::class.java)

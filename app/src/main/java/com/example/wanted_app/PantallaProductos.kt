@@ -32,6 +32,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 import com.example.wanted_app.ui.theme.*
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -58,17 +61,37 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
     var busquedasSeleccionadas by remember { mutableStateOf(setOf<String>()) }
     var plataformasSeleccionadas by remember { mutableStateOf(setOf<String>()) }
     var textoBusquedaManual by remember { mutableStateOf("") }
+    var soloFavoritos by remember { mutableStateOf(false) }
+    var ordenCampo by remember { mutableStateOf("fecha") }   // "fecha" o "precio"
+    var ordenAsc by remember { mutableStateOf(false) }       // false = descendente
+
+    // Recarga al entrar y luego cada 8 s, para ver en "tiempo real" lo que va llegando.
+    LaunchedEffect(Unit) {
+        while (true) {
+            viewModel.cargarProductos()
+            delay(8000)
+        }
+    }
 
     val productosList = viewModel.productos
 
     val todasBusquedas = productosList.map { it.busqueda }.distinct()
     val todasPlataformas = productosList.map { it.plataforma }.distinct()
 
-    val productosFiltrados = productosList.filter { producto ->
-        val pasaBusqueda = busquedasSeleccionadas.isEmpty() || producto.busqueda in busquedasSeleccionadas
-        val pasaPlataforma = plataformasSeleccionadas.isEmpty() || producto.plataforma in plataformasSeleccionadas
-        pasaBusqueda && pasaPlataforma
-    }
+    val productosFiltrados = productosList
+        .filter { producto ->
+            val pasaBusqueda = busquedasSeleccionadas.isEmpty() || producto.busqueda in busquedasSeleccionadas
+            val pasaPlataforma = plataformasSeleccionadas.isEmpty() || producto.plataforma in plataformasSeleccionadas
+            val pasaFavorito = !soloFavoritos || producto.esFavorito
+            pasaBusqueda && pasaPlataforma && pasaFavorito
+        }
+        .let { lista ->
+            val ordenada = when (ordenCampo) {
+                "precio" -> lista.sortedBy { it.precio }
+                else -> lista.sortedBy { it.tiempoDetectado }   // fecha ISO: ordena como texto = cronológico
+            }
+            if (ordenAsc) ordenada else ordenada.reversed()
+        }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Header
@@ -172,6 +195,69 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
                     }
                 }
 
+                // Fila: favoritos + orden
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                if (soloFavoritos) PrimaryLight
+                                else MaterialTheme.colorScheme.surfaceVariant,
+                                RoundedCornerShape(16.dp)
+                            )
+                            .clickable { soloFavoritos = !soloFavoritos }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            if (soloFavoritos) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = if (soloFavoritos) Favorito
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "Favoritos",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (soloFavoritos) PrimaryDark
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Spacer(Modifier.weight(1f))
+
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
+                            .clickable { ordenCampo = if (ordenCampo == "fecha") "precio" else "fecha" }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            if (ordenCampo == "precio") "Precio" else "Fecha",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = { ordenAsc = !ordenAsc }, modifier = Modifier.size(28.dp)) {
+                        Icon(
+                            if (ordenAsc) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Dirección de orden",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
                 // Contador
                 Text(
                     "${productosFiltrados.size} productos encontrados",
@@ -186,7 +272,7 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
                     verticalArrangement = Arrangement.spacedBy(if (vistaCompacta) 4.dp else 10.dp),
                     modifier = Modifier.animateContentSize()
                 ) {
-                    items(productosFiltrados) { producto ->
+                    items(productosFiltrados, key = { it.id }) { producto ->
                         if (vistaCompacta) {
                             TarjetaCompacta(
                                 producto = producto,
@@ -359,21 +445,29 @@ fun TarjetaProductoNueva(producto: Producto, onDescartar: () -> Unit, onFavorito
                             .background(MaterialTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("Imagen ampliada", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (producto.imagenUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = producto.imagenUrl,
+                                contentDescription = producto.nombre,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Text("Sin imagen", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(producto.imagenes) { img ->
-                            Box(
+                            AsyncImage(
+                                model = img,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
                                 modifier = Modifier
                                     .size(56.dp)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(MaterialTheme.colorScheme.surfaceVariant)
-                                    .clickable { },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("IMG", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+                            )
                         }
                     }
                     Spacer(modifier = Modifier.height(12.dp))
@@ -455,12 +549,21 @@ fun TarjetaProductoNueva(producto: Producto, onDescartar: () -> Unit, onFavorito
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    producto.plataforma.first().toString(),
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (producto.imagenUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = producto.imagenUrl,
+                        contentDescription = producto.nombre,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Text(
+                        producto.plataforma.firstOrNull()?.toString() ?: "?",
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 if (producto.imagenes.size > 1) {
                     Box(
                         modifier = Modifier

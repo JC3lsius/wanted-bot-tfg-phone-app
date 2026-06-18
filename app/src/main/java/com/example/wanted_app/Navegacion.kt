@@ -39,11 +39,9 @@ fun AppPrincipal() {
 
         val botonesBarra = listOf(
             BotonBarra(Icons.Default.Home, "inicio"),
-            BotonBarra(Icons.Default.Person, "perfil"),
-            BotonBarra(Icons.Default.Settings, "config_app"),
-            BotonBarra(Icons.Default.Build, "config_bot"),
-            BotonBarra(Icons.Default.Favorite, "favoritos"),
             BotonBarra(Icons.Default.ShoppingCart, "productos"),
+            BotonBarra(Icons.Default.Build, "config_bot"),
+            BotonBarra(Icons.Default.Settings, "config_app"),
         )
 
         Scaffold(
@@ -119,12 +117,19 @@ fun AppPrincipal() {
                         }
                     )
                 }
-                composable(Pantalla.Busquedas.ruta) { PantallaBusquedas() }
                 composable(Pantalla.Productos.ruta) { PantallaProductos(viewModel) }
-                composable(Pantalla.Favoritos.ruta) { PantallaFavoritos(viewModel) }
-                composable(Pantalla.Perfil.ruta) { PantallaPerfil() }
                 composable("config_bot") { PantallaConfigBot() }
-                composable("config_app") { PantallaConfigApp() }
+                composable("config_app") {
+                    PantallaConfigApp(
+                        onCerrarSesion = {
+                            Sesion.cerrar()
+                            navController.navigate("login") {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    )
+                }
             }
         }
     }

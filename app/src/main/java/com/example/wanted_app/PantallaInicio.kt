@@ -1,23 +1,15 @@
 package com.example.wanted_app
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -28,217 +20,167 @@ import com.example.wanted_app.ui.theme.*
 fun PantallaInicio(
     onNavegar: (String) -> Unit = {}
 ) {
+    var stats by remember { mutableStateOf<StatsDto?>(null) }
+    var ultimo by remember { mutableStateOf<Producto?>(null) }
+    var cargando by remember { mutableStateOf(true) }
+
+    // Carga datos reales del backend al entrar.
+    LaunchedEffect(Unit) {
+        try {
+            stats = RetrofitCliente.api.getStats()
+            val lista = RetrofitCliente.api.getProductos(limite = 1)
+            ultimo = lista.firstOrNull()?.let {
+                Producto(
+                    id = it.id, nombre = it.nombre, precio = it.precio,
+                    plataforma = it.plataforma, imagenUrl = it.imagenUrl,
+                    enlace = it.enlace, tiempoDetectado = it.fechaDetectado ?: "",
+                    esFavorito = it.favorito, busqueda = it.busqueda, imagenes = it.imagenes
+                )
+            }
+        } catch (_: Exception) {
+            // Si el backend no responde, dejamos los datos vacíos (se muestra el aviso).
+        } finally {
+            cargando = false
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Cabecera: avatar + nombre + balance
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(Modifier.height(24.dp))
+
+        // Avatar + nombre
         Box(
             modifier = Modifier
-                .size(52.dp)
-                .background(
-                    MaterialTheme.colorScheme.surfaceVariant,
-                    CircleShape
-                ),
+                .size(56.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 Icons.Default.Person,
                 contentDescription = "Avatar",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(26.dp)
             )
         }
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(Modifier.height(10.dp))
+        Text("WANTED BOT", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(2.dp))
         Text(
-            "WANTED BOT",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold
+            if (Sesion.nombre != null) "Hola, ${Sesion.nombre}" else "Bienvenido",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Box(
+
+        Spacer(Modifier.height(24.dp))
+
+        // Estadísticas reales (/stats)
+        Row(
             modifier = Modifier
-                .background(PrimaryLight, RoundedCornerShape(8.dp))
-                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
-                "304,00 EUR",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = PrecioColor
-            )
+            TarjetaStat("Productos", stats?.totalProductos, Modifier.weight(1f))
+            TarjetaStat("Favoritos", stats?.totalFavoritos, Modifier.weight(1f))
+            TarjetaStat("Búsquedas", stats?.totalBusquedas, Modifier.weight(1f))
         }
-        Text(
-            "Balance total ahorrado",
-            fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp)
-        )
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(Modifier.height(24.dp))
 
-        // Último pedido
-        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        // Último producto DETECTADO (esto sí lo sabemos; lo trae el scraper)
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
             Text(
-                "Ultimo pedido",
+                "Último detectado",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
             )
+
+            val u = ultimo
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
                 border = CardDefaults.outlinedCardBorder()
             ) {
-                Row(
-                    modifier = Modifier.padding(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
+                if (u != null) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                u.plataforma.take(1),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                u.nombre,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                u.plataforma,
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            String.format("%.2f EUR", u.precio),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = PrecioColor
+                        )
+                    }
+                } else {
                     Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "V",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            if (cargando) "Cargando…" else "Aún no hay productos detectados",
+                            fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Text(
-                        "Nike Air Max 90",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        "34,99 EUR",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = PrecioColor
-                    )
-                    Box(
-                        modifier = Modifier
-                            .background(PrimaryLight, RoundedCornerShape(6.dp))
-                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            "En envío",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = PrimaryDark
                         )
                     }
                 }
             }
-            Text(
-                ". . .",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 6.dp),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
         }
+    }
+}
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Iconos de pedidos finalizados y activos
+@Composable
+private fun TarjetaStat(etiqueta: String, valor: Int?, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = PrimaryLight)
+    ) {
         Column(
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            IconoConBadge(
-                icono = Icons.Default.Notifications,
-                contador = 4,
-                colorBadge = Favorito,
-                onClick = { }
+            Text(
+                valor?.toString() ?: "—",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = PrimaryDark
             )
-            IconoConBadge(
-                icono = Icons.Default.ShoppingCart,
-                contador = 4,
-                colorBadge = Color(0xFF378ADD),
-                onClick = { }
-            )
+            Spacer(Modifier.height(2.dp))
+            Text(etiqueta, fontSize = 11.sp, color = PrimaryDark)
         }
-
-    }
-}
-
-@Composable
-fun IconoConBadge(
-    icono: ImageVector,
-    contador: Int,
-    colorBadge: Color,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .background(
-                MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(14.dp)
-            )
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            icono,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(22.dp)
-        )
-        if (contador > 0) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 4.dp, y = (-4).dp)
-                    .size(20.dp)
-                    .background(colorBadge, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "$contador",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun BotonAccesoRapido(
-    icono: ImageVector,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .size(44.dp)
-            .background(
-                MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(12.dp)
-            )
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            icono,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
-        )
     }
 }
