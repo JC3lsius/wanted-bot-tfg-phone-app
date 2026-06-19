@@ -19,6 +19,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import kotlin.math.roundToInt
+
+// Máximo de búsquedas activas simultáneas. Límite "blando" de cliente: súbelo o
+// ignóralo desde el futuro modo administrador. El límite "duro" iría en el backend.
+const val MAX_BUSQUEDAS_ACTIVAS = 4
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -41,8 +50,11 @@ fun PantallaConfigBot() {
     var limiteProductos by remember { mutableStateOf(0) }
     var busquedaLimpiar by remember { mutableStateOf<BusquedaDto?>(null) }
     var guardando by remember { mutableStateOf(false) }
+    var avanzadasAbierto by remember { mutableStateOf(false) }
 
     val plataformasDisponibles = listOf("Vinted", "Wallapop", "eBay", "Milanuncios")
+
+    val activas = busquedas.count { it.activa }
 
     fun recargar() {
         scope.launch {
@@ -103,8 +115,10 @@ fun PantallaConfigBot() {
         OutlinedCard(shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Text("Nueva búsqueda", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(10.dp))
 
+                Spacer(Modifier.height(14.dp))
+                Text("Qué buscar", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = nombre,
                     onValueChange = { nombre = it },
@@ -112,22 +126,6 @@ fun PantallaConfigBot() {
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-
-                Spacer(Modifier.height(10.dp))
-                Text("Plataformas", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(4.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    plataformasDisponibles.forEach { p ->
-                        val sel = p in plataformasSel
-                        FilterChip(
-                            selected = sel,
-                            onClick = {
-                                plataformasSel = if (sel) plataformasSel - p else plataformasSel + p
-                            },
-                            label = { Text(p, fontSize = 12.sp) }
-                        )
-                    }
-                }
 
                 Spacer(Modifier.height(12.dp))
                 EntradaEtiquetas(
@@ -145,7 +143,25 @@ fun PantallaConfigBot() {
                     onQuitar = { excluidas = excluidas - it }
                 )
 
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(16.dp))
+                Text("Dónde buscar", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(8.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    plataformasDisponibles.forEach { p ->
+                        val sel = p in plataformasSel
+                        FilterChip(
+                            selected = sel,
+                            onClick = {
+                                plataformasSel = if (sel) plataformasSel - p else plataformasSel + p
+                            },
+                            label = { Text(p, fontSize = 12.sp) }
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+                Text("Filtros", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
                         value = precioMin,
@@ -165,71 +181,112 @@ fun PantallaConfigBot() {
                     )
                 }
 
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { avanzadasAbierto = !avanzadasAbierto },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Opciones avanzadas",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        if (avanzadasAbierto) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (avanzadasAbierto) "Contraer" else "Expandir",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                AnimatedVisibility(visible = avanzadasAbierto) {
+                    Column {
+                        Spacer(Modifier.height(8.dp))
+                        Text("Tipo de búsqueda", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(6.dp))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = tipo == "listener",
+                                onClick = { tipo = "listener" },
+                                label = { Text("Listener", fontSize = 12.sp) }
+                            )
+                            FilterChip(
+                                selected = tipo == "once",
+                                onClick = { tipo = "once" },
+                                label = { Text("Una vez", fontSize = 12.sp) }
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            if (tipo == "once") "Barrido exhaustivo: trae todo lo que coincide y se detiene."
+                            else "Tiempo real: vigila y avisa solo de lo recién publicado.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(Modifier.height(16.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "Profundidad",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            )
+                            OutlinedTextField(
+                                value = if (profundidad <= 0) "" else profundidad.toString(),
+                                onValueChange = { nuevo ->
+                                    val n = nuevo.filter { it.isDigit() }.toIntOrNull()
+                                    profundidad = when {
+                                        n == null -> 0
+                                        n <= 0 -> 0
+                                        n > 15 -> 0
+                                        else -> n
+                                    }
+                                },
+                                placeholder = { Text("∞") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.width(110.dp)
+                            )
+                        }
+                        Slider(
+                            value = (if (profundidad <= 0) 16 else profundidad.coerceIn(1, 16)).toFloat(),
+                            onValueChange = { v ->
+                                val iv = v.roundToInt()
+                                profundidad = if (iv >= 16) 0 else iv.coerceIn(1, 15)
+                            },
+                            valueRange = 1f..16f,
+                            steps = 14
+                        )
+                        Text(
+                            when {
+                                profundidad <= 0 -> "Sin límite (rastrea hasta agotar, máx. 60)"
+                                profundidad == 1 -> "1 página / vista (rápido)"
+                                else -> "$profundidad páginas o bajadas de scroll por barrido"
+                            },
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Más profundidad = más resultados pero más lento. Solo se nota en el modo 'Una vez'.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
                 Spacer(Modifier.height(14.dp))
-                Text("Tipo de búsqueda", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.height(6.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = tipo == "listener",
-                        onClick = { tipo = "listener" },
-                        label = { Text("Listener", fontSize = 12.sp) }
+                if (activas >= MAX_BUSQUEDAS_ACTIVAS) {
+                    Text(
+                        "Tienes el máximo de $MAX_BUSQUEDAS_ACTIVAS búsquedas activas. Detén una para crear otra.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.error
                     )
-                    FilterChip(
-                        selected = tipo == "once",
-                        onClick = { tipo = "once" },
-                        label = { Text("Una vez", fontSize = 12.sp) }
-                    )
+                    Spacer(Modifier.height(8.dp))
                 }
-                Text(
-                    if (tipo == "once") "Hace un barrido y se detiene."
-                    else "Sigue vigilando y avisa de lo nuevo.",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(Modifier.height(10.dp))
-                Text("Profundidad (páginas por barrido)", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.height(6.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = profundidad == 1,
-                        onClick = { profundidad = 1 },
-                        label = { Text("1 página", fontSize = 12.sp) }
-                    )
-                    FilterChip(
-                        selected = profundidad == 5,
-                        onClick = { profundidad = 5 },
-                        label = { Text("5 páginas", fontSize = 12.sp) }
-                    )
-                    FilterChip(
-                        selected = profundidad == 0,
-                        onClick = { profundidad = 0 },
-                        label = { Text("Sin límite", fontSize = 12.sp) }
-                    )
-                }
-
-                Spacer(Modifier.height(10.dp))
-                Text("Límite de productos por escaneo", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.height(6.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = limiteProductos == 0,
-                        onClick = { limiteProductos = 0 },
-                        label = { Text("Sin tope", fontSize = 12.sp) }
-                    )
-                    FilterChip(
-                        selected = limiteProductos == 50,
-                        onClick = { limiteProductos = 50 },
-                        label = { Text("50", fontSize = 12.sp) }
-                    )
-                    FilterChip(
-                        selected = limiteProductos == 100,
-                        onClick = { limiteProductos = 100 },
-                        label = { Text("100", fontSize = 12.sp) }
-                    )
-                }
-
-                Spacer(Modifier.height(14.dp))
                 Button(
                     onClick = {
                         guardando = true
@@ -267,7 +324,7 @@ fun PantallaConfigBot() {
                             }
                         }
                     },
-                    enabled = !guardando && nombre.isNotBlank(),
+                    enabled = !guardando && nombre.isNotBlank() && activas < MAX_BUSQUEDAS_ACTIVAS,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 ) {
@@ -279,7 +336,14 @@ fun PantallaConfigBot() {
         Spacer(Modifier.height(22.dp))
 
         // ====================== Lista de búsquedas ======================
-        Text("Búsquedas", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Búsquedas", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(
+                "En ejecución: $activas / $MAX_BUSQUEDAS_ACTIVAS",
+                fontSize = 12.sp,
+                color = if (activas >= MAX_BUSQUEDAS_ACTIVAS) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         Spacer(Modifier.height(8.dp))
 
         when {
@@ -326,17 +390,20 @@ fun PantallaConfigBot() {
                                 )
                             }
 
-                            TextButton(onClick = {
-                                scope.launch {
-                                    try {
-                                        if (b.activa) RetrofitCliente.api.pararBusqueda(b.id)
-                                        else RetrofitCliente.api.iniciarBusqueda(b.id)
-                                        recargar()
-                                    } catch (e: Exception) {
-                                        error = "Error al cambiar el estado: ${e.message}"
+                            TextButton(
+                                onClick = {
+                                    scope.launch {
+                                        try {
+                                            if (b.activa) RetrofitCliente.api.pararBusqueda(b.id)
+                                            else RetrofitCliente.api.iniciarBusqueda(b.id)
+                                            recargar()
+                                        } catch (e: Exception) {
+                                            error = "Error al cambiar el estado: ${e.message}"
+                                        }
                                     }
-                                }
-                            }) {
+                                },
+                                enabled = b.activa || activas < MAX_BUSQUEDAS_ACTIVAS
+                            ) {
                                 Text(if (b.activa) "Parar" else "Iniciar", fontSize = 13.sp)
                             }
 

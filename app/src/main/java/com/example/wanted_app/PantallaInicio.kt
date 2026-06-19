@@ -2,185 +2,213 @@ package com.example.wanted_app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.wanted_app.ui.theme.*
 
 @Composable
 fun PantallaInicio(
     onNavegar: (String) -> Unit = {}
 ) {
+    var busquedas by remember { mutableStateOf<List<BusquedaDto>>(emptyList()) }
     var stats by remember { mutableStateOf<StatsDto?>(null) }
-    var ultimo by remember { mutableStateOf<Producto?>(null) }
     var cargando by remember { mutableStateOf(true) }
 
-    // Carga datos reales del backend al entrar.
+    // Carga inicial: búsquedas (para las activas) + estadísticas (contadores reales).
     LaunchedEffect(Unit) {
         try {
+            busquedas = RetrofitCliente.api.getBusquedas()
             stats = RetrofitCliente.api.getStats()
-            val lista = RetrofitCliente.api.getProductos(limite = 1)
-            ultimo = lista.firstOrNull()?.let {
-                Producto(
-                    id = it.id, nombre = it.nombre, precio = it.precio,
-                    plataforma = it.plataforma, imagenUrl = it.imagenUrl,
-                    enlace = it.enlace, tiempoDetectado = it.fechaDetectado ?: "",
-                    esFavorito = it.favorito, busqueda = it.busqueda, imagenes = it.imagenes
-                )
-            }
         } catch (_: Exception) {
-            // Si el backend no responde, dejamos los datos vacíos (se muestra el aviso).
+            // Si el backend no responde, dejamos los valores por defecto (0 / vacío).
         } finally {
             cargando = false
         }
     }
 
+    val activas = busquedas.filter { it.activa }
+
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(Modifier.height(24.dp))
-
-        // Avatar + nombre
+        // ---------- Cabecera ----------
+        Spacer(Modifier.height(20.dp))
         Box(
             modifier = Modifier
-                .size(56.dp)
+                .size(52.dp)
                 .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 Icons.Default.Person,
-                contentDescription = "Avatar",
+                contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(26.dp)
+                modifier = Modifier.size(24.dp)
             )
         }
         Spacer(Modifier.height(10.dp))
         Text("WANTED BOT", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(2.dp))
+
+        // ---------- Titular: nº de búsquedas activas (real) ----------
+        Spacer(Modifier.height(16.dp))
+        Box(
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp))
+                .padding(horizontal = 22.dp, vertical = 8.dp)
+        ) {
+            Text(
+                "${activas.size}",
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
         Text(
-            if (Sesion.nombre != null) "Hola, ${Sesion.nombre}" else "Bienvenido",
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            if (activas.size == 1) "búsqueda activa" else "búsquedas activas",
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
         )
 
-        Spacer(Modifier.height(24.dp))
-
-        // Estadísticas reales (/stats)
+        // ---------- Fila de estadísticas reales ----------
+        Spacer(Modifier.height(18.dp))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            TarjetaStat("Productos", stats?.totalProductos, Modifier.weight(1f))
-            TarjetaStat("Favoritos", stats?.totalFavoritos, Modifier.weight(1f))
-            TarjetaStat("Búsquedas", stats?.totalBusquedas, Modifier.weight(1f))
+            TarjetaStat("Detectados", stats?.totalProductos ?: 0, Modifier.weight(1f))
+            TarjetaStat("Favoritos", stats?.totalFavoritos ?: 0, Modifier.weight(1f))
+            TarjetaStat("Comprados", stats?.totalComprados ?: 0, Modifier.weight(1f))
         }
 
-        Spacer(Modifier.height(24.dp))
-
-        // Último producto DETECTADO (esto sí lo sabemos; lo trae el scraper)
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-            Text(
-                "Último detectado",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-            )
-
-            val u = ultimo
-            Card(
+        // ---------- Sección: búsquedas activas ----------
+        Spacer(Modifier.height(22.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        ) {
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
-                border = CardDefaults.outlinedCardBorder()
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (u != null) {
-                    Row(
-                        modifier = Modifier.padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                u.plataforma.take(1),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                u.nombre,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                u.plataforma,
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Text(
-                            String.format("%.2f EUR", u.precio),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = PrecioColor
-                        )
-                    }
-                } else {
+                Text("Búsquedas activas", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                TextButton(onClick = { onNavegar("config_bot") }) { Text("Gestionar") }
+            }
+            Spacer(Modifier.height(4.dp))
+
+            when {
+                cargando -> {
                     Box(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
                         contentAlignment = Alignment.Center
+                    ) { CircularProgressIndicator() }
+                }
+
+                activas.isEmpty() -> {
+                    OutlinedCard(
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            if (cargando) "Cargando…" else "Aún no hay productos detectados",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "No tienes búsquedas activas",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            Button(
+                                onClick = { onNavegar("config_bot") },
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Crear búsqueda")
+                            }
+                        }
+                    }
+                }
+
+                else -> {
+                    activas.forEach { b ->
+                        OutlinedCard(
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Punto verde = activa
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(b.nombre, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                    if (b.plataformas.isNotEmpty()) {
+                                        Text(
+                                            b.plataformas.joinToString(", "),
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                Text(
+                                    "Activa",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
+
+        Spacer(Modifier.height(24.dp))
     }
 }
 
 @Composable
-private fun TarjetaStat(etiqueta: String, valor: Int?, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = PrimaryLight)
-    ) {
+private fun TarjetaStat(etiqueta: String, valor: Int, modifier: Modifier = Modifier) {
+    OutlinedCard(shape = RoundedCornerShape(12.dp), modifier = modifier) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                valor?.toString() ?: "—",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = PrimaryDark
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(etiqueta, fontSize = 11.sp, color = PrimaryDark)
+            Text("$valor", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(etiqueta, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
