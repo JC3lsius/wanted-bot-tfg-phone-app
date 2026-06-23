@@ -22,6 +22,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 
 @Composable
 fun PantallaRegistro(
@@ -48,21 +50,13 @@ fun PantallaRegistro(
     ) {
         Spacer(Modifier.height(48.dp))
 
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Default.Person,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(36.dp)
-            )
-        }
+        Image(
+            painter = painterResource(id = R.drawable.logo),
+            contentDescription = "Wanted logo",
+            modifier = Modifier.size(200.dp)
+        )
         Spacer(Modifier.height(16.dp))
-        Text("WANTED BOT", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text("WANTED", fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(4.dp))
         Text(
             "Crea tu cuenta",
