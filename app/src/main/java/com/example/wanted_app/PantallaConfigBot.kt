@@ -51,7 +51,7 @@ fun PantallaConfigBot() {
     var busquedaLimpiar by remember { mutableStateOf<BusquedaDto?>(null) }
     var guardando by remember { mutableStateOf(false) }
     var avanzadasAbierto by remember { mutableStateOf(false) }
-    var errorForm by remember { mutableStateOf<String?>(null) } 
+    var errorForm by remember { mutableStateOf<String?>(null) }   // error de validación del formulario de creación
 
     val plataformasDisponibles = listOf("Vinted", "Wallapop", "eBay", "Milanuncios")
 
@@ -211,7 +211,7 @@ fun PantallaConfigBot() {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             FilterChip(
                                 selected = tipo == "listener",
-                                onClick = { tipo = "listener" },
+                                onClick = { tipo = "listener"; limiteProductos = 0 },
                                 label = { Text("Listener", fontSize = 12.sp) }
                             )
                             FilterChip(
@@ -277,6 +277,37 @@ fun PantallaConfigBot() {
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+
+                        // Límite de productos: SOLO tiene efecto en modo 'Una vez' (once);
+                        // en 'Listener' (tiempo real) no se aplica, así que ni lo mostramos.
+                        if (tipo == "once") {
+                            Spacer(Modifier.height(16.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "Límite de productos",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                OutlinedTextField(
+                                    value = if (limiteProductos <= 0) "" else limiteProductos.toString(),
+                                    onValueChange = { nuevo ->
+                                        limiteProductos = nuevo.filter { it.isDigit() }.toIntOrNull()?.coerceAtLeast(0) ?: 0
+                                    },
+                                    placeholder = { Text("∞") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.width(110.dp)
+                                )
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                if (limiteProductos <= 0) "Sin límite: trae todo lo que coincida."
+                                else "Máximo $limiteProductos producto(s) por plataforma en el barrido.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
 
