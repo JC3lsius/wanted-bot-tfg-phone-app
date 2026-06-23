@@ -51,6 +51,7 @@ fun PantallaConfigBot() {
     var busquedaLimpiar by remember { mutableStateOf<BusquedaDto?>(null) }
     var guardando by remember { mutableStateOf(false) }
     var avanzadasAbierto by remember { mutableStateOf(false) }
+    var errorForm by remember { mutableStateOf<String?>(null) } 
 
     val plataformasDisponibles = listOf("Vinted", "Wallapop", "eBay", "Milanuncios")
 
@@ -153,6 +154,7 @@ fun PantallaConfigBot() {
                             selected = sel,
                             onClick = {
                                 plataformasSel = if (sel) plataformasSel - p else plataformasSel + p
+                                if (plataformasSel.isNotEmpty()) errorForm = null
                             },
                             label = { Text(p, fontSize = 12.sp) }
                         )
@@ -165,7 +167,7 @@ fun PantallaConfigBot() {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
                         value = precioMin,
-                        onValueChange = { nuevo -> precioMin = nuevo.filter { c -> c.isDigit() || c == '.' } },
+                        onValueChange = { nuevo -> precioMin = nuevo.filter { c -> c.isDigit() || c == '.' }; errorForm = null },
                         label = { Text("Precio mín") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -173,7 +175,7 @@ fun PantallaConfigBot() {
                     )
                     OutlinedTextField(
                         value = precioMax,
-                        onValueChange = { nuevo -> precioMax = nuevo.filter { c -> c.isDigit() || c == '.' } },
+                        onValueChange = { nuevo -> precioMax = nuevo.filter { c -> c.isDigit() || c == '.' }; errorForm = null },
                         label = { Text("Precio máx") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -289,6 +291,26 @@ fun PantallaConfigBot() {
                 }
                 Button(
                     onClick = {
+                        errorForm = null
+                        if (plataformasSel.isEmpty()) {
+                            errorForm = "Selecciona al menos una plataforma de compraventa"
+                            return@Button
+                        }
+                        // Validación de precio: texto numérico válido y mín <= máx.
+                        val min = precioMin.toDoubleOrNull()
+                        val max = precioMax.toDoubleOrNull()
+                        if (precioMin.isNotBlank() && min == null) {
+                            errorForm = "El precio mínimo no es un número válido"
+                            return@Button
+                        }
+                        if (precioMax.isNotBlank() && max == null) {
+                            errorForm = "El precio máximo no es un número válido"
+                            return@Button
+                        }
+                        if (min != null && max != null && min > max) {
+                            errorForm = "El precio mínimo no puede ser mayor que el máximo"
+                            return@Button
+                        }
                         guardando = true
                         error = null
                         scope.launch {
@@ -329,6 +351,11 @@ fun PantallaConfigBot() {
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(if (guardando) "Creando..." else "Crear búsqueda")
+                }
+
+                if (errorForm != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(errorForm!!, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                 }
             }
         }
