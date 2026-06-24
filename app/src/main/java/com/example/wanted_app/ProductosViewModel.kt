@@ -73,6 +73,25 @@ class ProductosViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Refresco automático en segundo plano: trae la primera página y añade SOLO
+     * los productos nuevos (por id) al principio de la lista, sin vaciarla, sin
+     * spinner y sin mostrar error si falla. Devuelve cuántos se añadieron.
+     * Pensado para llamarse periódicamente desde la pantalla de productos.
+     */
+    suspend fun refrescarSilencioso(): Int {
+        if (cargando || cargandoMas) return 0
+        return try {
+            val lista = RetrofitCliente.api.getProductos(pagina = 1, limite = tamPagina)
+            val nuevos = lista.map { it.aProducto() }
+                .filter { nuevo -> _productos.none { it.id == nuevo.id } }
+            if (nuevos.isNotEmpty()) _productos.addAll(0, nuevos)
+            nuevos.size
+        } catch (_: Exception) {
+            0
+        }
+    }
+
     fun toggleFavorito(id: String) {
         val index = _productos.indexOfFirst { it.id == id }
         if (index != -1) {

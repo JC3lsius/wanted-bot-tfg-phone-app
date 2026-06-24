@@ -39,6 +39,7 @@ import coil.compose.AsyncImage
 import com.example.wanted_app.ui.theme.*
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import kotlinx.coroutines.delay
 
 data class PlataformaInfo(
     val nombre: String,
@@ -54,6 +55,7 @@ val plataformas = mapOf(
 )
 
 private val TARJETA_ALTURA = 130.dp
+private const val AUTO_REFRESCO_MS = 5_000L  // refresco automático de la lista
 
 @Composable
 fun PantallaProductos(viewModel: ProductosViewModel) {
@@ -113,6 +115,20 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
     }
     LaunchedEffect(cargarMasAhora) {
         if (cargarMasAhora) viewModel.cargarMas()
+    }
+
+    // Auto-refresco: mientras esta pantalla está visible, cada AUTO_REFRESCO_MS
+    // trae los productos nuevos sin recargar a mano. Se cancela al salir de la
+    // pantalla. Si llegan novedades y el usuario está justo arriba del todo, sube
+    // la lista para enseñárselas; si está desplazado, se mantiene en su sitio.
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(AUTO_REFRESCO_MS)
+            val estabaArriba = listState.firstVisibleItemIndex == 0 &&
+                listState.firstVisibleItemScrollOffset == 0
+            val nuevos = viewModel.refrescarSilencioso()
+            if (nuevos > 0 && estabaArriba) listState.animateScrollToItem(0)
+        }
     }
 
     if (mostrarConfirmarBorrado) {
