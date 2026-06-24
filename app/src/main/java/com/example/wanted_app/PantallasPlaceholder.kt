@@ -5,7 +5,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -111,6 +113,81 @@ fun PantallaConfigApp(onCerrarSesion: () -> Unit = {}) {
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        OutlinedCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    "Refresco automático de productos",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Ahora mismo: cada ${Ajustes.intervaloRefrescoSeg} s.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+
+                // Valor en edición (texto para permitir borrar/escribir). No se
+                // aplica hasta pulsar "Aplicar".
+                var texto by remember { mutableStateOf(Ajustes.intervaloRefrescoSeg.toString()) }
+                val valor = texto.toIntOrNull()
+                val valido = valor != null && valor in Ajustes.INTERVALO_MIN..Ajustes.INTERVALO_MAX
+                val hayCambio = valido && valor != Ajustes.intervaloRefrescoSeg
+                val puedeBajar = (valor ?: Ajustes.INTERVALO_MIN) > Ajustes.INTERVALO_MIN
+                val puedeSubir = (valor ?: Ajustes.INTERVALO_MAX) < Ajustes.INTERVALO_MAX
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = {
+                            val base = texto.toIntOrNull() ?: Ajustes.intervaloRefrescoSeg
+                            texto = (base - 1).coerceIn(Ajustes.INTERVALO_MIN, Ajustes.INTERVALO_MAX).toString()
+                        },
+                        enabled = puedeBajar
+                    ) { Text("−", fontSize = 22.sp) }
+
+                    OutlinedTextField(
+                        value = texto,
+                        onValueChange = { nuevo -> texto = nuevo.filter { it.isDigit() }.take(2) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.width(72.dp)
+                    )
+
+                    IconButton(
+                        onClick = {
+                            val base = texto.toIntOrNull() ?: Ajustes.intervaloRefrescoSeg
+                            texto = (base + 1).coerceIn(Ajustes.INTERVALO_MIN, Ajustes.INTERVALO_MAX).toString()
+                        },
+                        enabled = puedeSubir
+                    ) { Text("+", fontSize = 22.sp) }
+
+                    Text("s", fontSize = 13.sp, modifier = Modifier.padding(start = 4.dp))
+
+                    Spacer(Modifier.weight(1f))
+
+                    Button(
+                        onClick = { valor?.let { Ajustes.fijarIntervalo(it) } },
+                        enabled = hayCambio
+                    ) { Text("Aplicar") }
+                }
+
+                if (texto.isNotEmpty() && !valido) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Debe estar entre ${Ajustes.INTERVALO_MIN} y ${Ajustes.INTERVALO_MAX} s.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
 

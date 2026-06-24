@@ -55,7 +55,6 @@ val plataformas = mapOf(
 )
 
 private val TARJETA_ALTURA = 130.dp
-private const val AUTO_REFRESCO_MS = 5_000L  // refresco automático de la lista
 
 @Composable
 fun PantallaProductos(viewModel: ProductosViewModel) {
@@ -117,13 +116,13 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
         if (cargarMasAhora) viewModel.cargarMas()
     }
 
-    // Auto-refresco: mientras esta pantalla está visible, cada AUTO_REFRESCO_MS
+    // Auto-refresco: mientras esta pantalla está visible, cada intervalo (Ajustes)
     // trae los productos nuevos sin recargar a mano. Se cancela al salir de la
     // pantalla. Si llegan novedades y el usuario está justo arriba del todo, sube
     // la lista para enseñárselas; si está desplazado, se mantiene en su sitio.
     LaunchedEffect(Unit) {
         while (true) {
-            delay(AUTO_REFRESCO_MS)
+            delay(Ajustes.intervaloRefrescoSeg * 1000L)
             val estabaArriba = listState.firstVisibleItemIndex == 0 &&
                 listState.firstVisibleItemScrollOffset == 0
             val nuevos = viewModel.refrescarSilencioso()
