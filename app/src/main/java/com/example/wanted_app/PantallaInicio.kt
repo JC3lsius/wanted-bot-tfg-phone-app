@@ -182,6 +182,12 @@ fun PantallaInicio(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
+                                    val tipoTexto = if (b.tipo == "once") "Una vez" else "Listener"
+                                    Text(
+                                        "$tipoTexto · ${b.numProductos} producto${if (b.numProductos == 1) "" else "s"}",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                                 Text(
                                     "Activa",

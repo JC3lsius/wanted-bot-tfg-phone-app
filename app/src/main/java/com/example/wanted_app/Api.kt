@@ -66,7 +66,8 @@ data class BusquedaDto(
     val profundidad: Int = 1,
     @SerializedName("limite_productos") val limiteProductos: Int = 0,
     val activa: Boolean = false,
-    @SerializedName("estado_hilo") val estadoHilo: String = "detenido"
+    @SerializedName("estado_hilo") val estadoHilo: String = "detenido",
+    @SerializedName("num_productos") val numProductos: Int = 0
 )
 
 // Cuerpo de POST /busquedas
