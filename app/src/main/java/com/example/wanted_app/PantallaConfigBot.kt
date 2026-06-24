@@ -542,6 +542,12 @@ fun PantallaConfigBot() {
                                 try {
                                     if (editandoActual != null) {
                                         RetrofitCliente.api.actualizarBusqueda(editandoActual.id, req)
+                                        // Si la búsqueda estaba en ejecución, modificar sus
+                                        // parámetros la deja detenida: el usuario debe volver a
+                                        // iniciarla para que el scraper aplique los nuevos valores.
+                                        if (editandoActual.activa) {
+                                            RetrofitCliente.api.pararBusqueda(editandoActual.id)
+                                        }
                                     } else {
                                         RetrofitCliente.api.crearBusqueda(req)
                                     }
