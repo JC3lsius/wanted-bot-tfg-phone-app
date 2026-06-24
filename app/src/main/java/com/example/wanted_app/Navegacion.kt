@@ -14,7 +14,37 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavController
+import androidx.navigation.NavOptionsBuilder
+import androidx.lifecycle.Lifecycle
 import com.example.wanted_app.ui.theme.WantedAppTheme
+
+/**
+ * Navega solo si la pantalla actual está RESUMED. Pulsar un botón muy rápido
+ * disparaba varias navegaciones en el mismo frame (antes de que terminara la
+ * transición), lo que apilaba pantallas duplicadas o, combinado con popBackStack,
+ * dejaba el NavHost sin destino (pantalla en blanco). El estado RESUMED solo se
+ * da en la pantalla "activa": tras la primera navegación deja de estarlo, así
+ * que las pulsaciones extra se ignoran hasta que la transición termina.
+ */
+private fun NavController.navegarSeguro(
+    ruta: String,
+    builder: NavOptionsBuilder.() -> Unit = {}
+) {
+    if (currentBackStackEntry?.lifecycle?.currentState == Lifecycle.State.RESUMED) {
+        navigate(ruta, builder)
+    }
+}
+
+/**
+ * Vuelve atrás solo si la pantalla actual está RESUMED, evitando que varias
+ * pulsaciones rápidas hagan popBackStack de más y vacíen la pila.
+ */
+private fun NavController.volverSeguro() {
+    if (currentBackStackEntry?.lifecycle?.currentState == Lifecycle.State.RESUMED) {
+        popBackStack()
+    }
+}
 
 sealed class Pantalla(val ruta: String, val titulo: String, val icono: ImageVector) {
     object Inicio : Pantalla("inicio", "Inicio", Icons.Default.Home)
@@ -68,7 +98,7 @@ fun AppPrincipal() {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 botonesBarra.forEach { boton ->
-                                    IconButton(onClick = { navController.navigate(boton.ruta) }) {
+                                    IconButton(onClick = { navController.navegarSeguro(boton.ruta) { launchSingleTop = true } }) {
                                         Icon(imageVector = boton.icono, contentDescription = null)
                                     }
                                 }
@@ -86,30 +116,30 @@ fun AppPrincipal() {
                 composable("login") {
                     PantallaLogin(
                         onLoginExitoso = {
-                            navController.navigate(Pantalla.Inicio.ruta) {
+                            navController.navegarSeguro(Pantalla.Inicio.ruta) {
                                 popUpTo("login") { inclusive = true }
                                 launchSingleTop = true
                             }
                         },
-                        onIrARegistro = { navController.navigate("registro") }
+                        onIrARegistro = { navController.navegarSeguro("registro") { launchSingleTop = true } }
                     )
                 }
                 composable("registro") {
                     PantallaRegistro(
                         onRegistroExitoso = {
                             // Tras registrarse, entra a la app y limpia login + registro de la pila.
-                            navController.navigate(Pantalla.Inicio.ruta) {
+                            navController.navegarSeguro(Pantalla.Inicio.ruta) {
                                 popUpTo("login") { inclusive = true }
                                 launchSingleTop = true
                             }
                         },
-                        onVolverALogin = { navController.popBackStack() }
+                        onVolverALogin = { navController.volverSeguro() }
                     )
                 }
                 composable(Pantalla.Inicio.ruta) {
                     PantallaInicio(
                         onNavegar = { ruta ->
-                            navController.navigate(ruta) {
+                            navController.navegarSeguro(ruta) {
                                 popUpTo(Pantalla.Inicio.ruta) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
@@ -123,7 +153,7 @@ fun AppPrincipal() {
                     PantallaConfigApp(
                         onCerrarSesion = {
                             Sesion.cerrar()
-                            navController.navigate("login") {
+                            navController.navegarSeguro("login") {
                                 popUpTo(navController.graph.id) { inclusive = true }
                                 launchSingleTop = true
                             }
