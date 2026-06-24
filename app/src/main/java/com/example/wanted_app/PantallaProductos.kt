@@ -59,7 +59,7 @@ private val TARJETA_ALTURA = 130.dp
 fun PantallaProductos(viewModel: ProductosViewModel) {
     var vistaCompacta by remember { mutableStateOf(false) }
     var mostrarBusquedas by remember { mutableStateOf(false) }
-    var busquedasSeleccionadas by remember { mutableStateOf(setOf<String>()) }
+    var busquedasSeleccionadas by remember { mutableStateOf(setOf<Int>()) }
     var plataformasSeleccionadas by remember { mutableStateOf(setOf<String>()) }
     var textoBusquedaManual by remember { mutableStateOf("") }
     var soloFavoritos by remember { mutableStateOf(false) }
@@ -67,17 +67,29 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
     var ordenAsc by remember { mutableStateOf(false) }       // false = descendente
     var mostrarConfirmarBorrado by remember { mutableStateOf(false) }
 
-    // Recarga la primera página al entrar a la pantalla (p. ej. tras crear una búsqueda).
-    LaunchedEffect(Unit) { viewModel.cargarProductos() }
-
     val productosList = viewModel.productos
 
-    val todasBusquedas = productosList.map { it.busqueda }.distinct()
+    // Cargamos las búsquedas reales del backend para poder mostrar su NOMBRE
+    // (el campo producto.busqueda trae la URL, no sirve para el filtro).
+    var busquedasBackend by remember { mutableStateOf<List<BusquedaDto>>(emptyList()) }
+
+    // Recarga búsquedas + primera página al entrar (p. ej. tras crear una búsqueda).
+    LaunchedEffect(Unit) {
+        try { busquedasBackend = RetrofitCliente.api.getBusquedas() } catch (_: Exception) {}
+        viewModel.cargarProductos()
+    }
+
+    // Mapa de busquedaId → nombre legible
+    val mapaBusquedas: Map<Int, String> = busquedasBackend.associate { it.id to it.nombre }
+
+    // Las "búsquedas" del filtro son los IDs presentes en los productos
+    val todasBusquedas = productosList.mapNotNull { it.busquedaId }.distinct()
     val todasPlataformas = productosList.map { it.plataforma }.distinct()
 
     val productosFiltrados = productosList
         .filter { producto ->
-            val pasaBusqueda = busquedasSeleccionadas.isEmpty() || producto.busqueda in busquedasSeleccionadas
+            val pasaBusqueda = busquedasSeleccionadas.isEmpty() ||
+                (producto.busquedaId != null && producto.busquedaId in busquedasSeleccionadas)
             val pasaPlataforma = plataformasSeleccionadas.isEmpty() || producto.plataforma in plataformasSeleccionadas
             val pasaFavorito = !soloFavoritos || producto.esFavorito
             pasaBusqueda && pasaPlataforma && pasaFavorito
@@ -310,17 +322,20 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
                     modifier = Modifier.animateContentSize()
                 ) {
                     items(productosFiltrados, key = { it.id }) { producto ->
+                        val nombreBusqueda = producto.busquedaId?.let { mapaBusquedas[it] } ?: ""
                         if (vistaCompacta) {
                             TarjetaCompacta(
                                 producto = producto,
                                 onDescartar = { viewModel.descartar(producto.id) },
-                                onFavorito = { viewModel.toggleFavorito(producto.id) }
+                                onFavorito = { viewModel.toggleFavorito(producto.id) },
+                                nombreBusqueda = nombreBusqueda
                             )
                         } else {
                             TarjetaProductoNueva(
                                 producto = producto,
                                 onDescartar = { viewModel.descartar(producto.id) },
-                                onFavorito = { viewModel.toggleFavorito(producto.id) }
+                                onFavorito = { viewModel.toggleFavorito(producto.id) },
+                                nombreBusqueda = nombreBusqueda
                             )
                         }
                     }
@@ -404,14 +419,17 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
 
                         Spacer(modifier = Modifier.height(4.dp))
 
-                        // Lista de busquedas con checkboxes
-                        val busquedasFiltradas = todasBusquedas.filter {
+                        // Lista de busquedas con checkboxes.
+                        // Filtramos por el NOMBRE legible (no por el id).
+                        val busquedasFiltradas = todasBusquedas.filter { id ->
+                            val nombre = mapaBusquedas[id] ?: ""
                             textoBusquedaManual.isBlank() ||
-                                    it.contains(textoBusquedaManual, ignoreCase = true)
+                                    nombre.contains(textoBusquedaManual, ignoreCase = true)
                         }
-                        busquedasFiltradas.forEach { busqueda ->
-                            val seleccionada = busqueda in busquedasSeleccionadas
-                            val count = productosList.count { it.busqueda == busqueda }
+                        busquedasFiltradas.forEach { busquedaId ->
+                            val nombre = mapaBusquedas[busquedaId] ?: "Búsqueda $busquedaId"
+                            val seleccionada = busquedaId in busquedasSeleccionadas
+                            val count = productosList.count { it.busquedaId == busquedaId }
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -422,9 +440,9 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
                                     )
                                     .clickable {
                                         busquedasSeleccionadas = if (seleccionada)
-                                            busquedasSeleccionadas - busqueda
+                                            busquedasSeleccionadas - busquedaId
                                         else
-                                            busquedasSeleccionadas + busqueda
+                                            busquedasSeleccionadas + busquedaId
                                     }
                                     .padding(horizontal = 10.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -434,9 +452,9 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
                                     checked = seleccionada,
                                     onCheckedChange = {
                                         busquedasSeleccionadas = if (seleccionada)
-                                            busquedasSeleccionadas - busqueda
+                                            busquedasSeleccionadas - busquedaId
                                         else
-                                            busquedasSeleccionadas + busqueda
+                                            busquedasSeleccionadas + busquedaId
                                     },
                                     modifier = Modifier.size(18.dp),
                                     colors = CheckboxDefaults.colors(
@@ -445,7 +463,7 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
                                     )
                                 )
                                 Text(
-                                    busqueda,
+                                    nombre,
                                     fontSize = 13.sp,
                                     fontWeight = if (seleccionada) FontWeight.Medium else FontWeight.Normal,
                                     color = if (seleccionada) MaterialTheme.colorScheme.onSurface
@@ -467,7 +485,7 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
 }
 
 @Composable
-fun TarjetaProductoNueva(producto: Producto, onDescartar: () -> Unit, onFavorito: () -> Unit) {
+fun TarjetaProductoNueva(producto: Producto, onDescartar: () -> Unit, onFavorito: () -> Unit, nombreBusqueda: String = "") {
     val info = plataformas[producto.plataforma]
     var mostrarChat by remember { mutableStateOf(false) }
     var mostrarGaleria by remember { mutableStateOf(false) }
@@ -676,7 +694,7 @@ fun TarjetaProductoNueva(producto: Producto, onDescartar: () -> Unit, onFavorito
 
                 Column {
                     Text(
-                        producto.busqueda,
+                        nombreBusqueda.ifBlank { producto.busqueda },
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                         maxLines = 1, overflow = TextOverflow.Ellipsis
@@ -753,7 +771,7 @@ fun TarjetaProductoNueva(producto: Producto, onDescartar: () -> Unit, onFavorito
 }
 
 @Composable
-fun TarjetaCompacta(producto: Producto, onDescartar: () -> Unit, onFavorito: () -> Unit) {
+fun TarjetaCompacta(producto: Producto, onDescartar: () -> Unit, onFavorito: () -> Unit, nombreBusqueda: String = "") {
     val info = plataformas[producto.plataforma]
     var mostrarChat by remember { mutableStateOf(false) }
     var botonActivo by remember { mutableStateOf<String?>(null) }
@@ -817,7 +835,7 @@ fun TarjetaCompacta(producto: Producto, onDescartar: () -> Unit, onFavorito: () 
             Column(modifier = Modifier.weight(1f)) {
                 Text(producto.nombre, fontWeight = FontWeight.Medium, fontSize = 13.sp,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(producto.busqueda, fontSize = 10.sp,
+                Text(nombreBusqueda.ifBlank { producto.busqueda }, fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), maxLines = 1)
             }
             Text(String.format("%.0f EUR", producto.precio), fontWeight = FontWeight.Bold,
