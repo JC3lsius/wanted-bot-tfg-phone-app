@@ -10,5 +10,6 @@ data class Producto(
     val tiempoDetectado: String = "",
     val esFavorito: Boolean = false,
     val busqueda: String = "",
+    val busquedaId: Int? = null,
     val imagenes: List<String> = emptyList()
 )
