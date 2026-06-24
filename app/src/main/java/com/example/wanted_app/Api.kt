@@ -123,6 +123,9 @@ interface ApiService {
     @POST("busquedas")
     suspend fun crearBusqueda(@Body datos: BusquedaCrearRequest): BusquedaDto
 
+    @PUT("busquedas/{id}")
+    suspend fun actualizarBusqueda(@Path("id") id: Int, @Body datos: BusquedaCrearRequest): BusquedaDto
+
     @POST("busquedas/{id}/iniciar")
     suspend fun iniciarBusqueda(@Path("id") id: Int): MensajeResponse
 
