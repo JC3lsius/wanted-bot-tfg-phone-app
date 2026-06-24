@@ -115,5 +115,6 @@ private fun ProductoDto.aProducto() = Producto(
     tiempoDetectado = fechaDetectado ?: "",
     esFavorito = favorito,
     busqueda = busqueda,
+    busquedaId = busquedaId,
     imagenes = imagenes
 )
