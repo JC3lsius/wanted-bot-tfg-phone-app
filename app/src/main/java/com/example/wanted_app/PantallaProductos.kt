@@ -39,7 +39,6 @@ import coil.compose.AsyncImage
 import com.example.wanted_app.ui.theme.*
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import kotlinx.coroutines.delay
 
 data class PlataformaInfo(
     val nombre: String,
@@ -116,18 +115,18 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
         if (cargarMasAhora) viewModel.cargarMas()
     }
 
-    // Auto-refresco: mientras esta pantalla está visible, cada intervalo (Ajustes)
-    // trae los productos nuevos sin recargar a mano. Se cancela al salir de la
-    // pantalla. Si llegan novedades y el usuario está justo arriba del todo, sube
-    // la lista para enseñárselas; si está desplazado, se mantiene en su sitio.
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(Ajustes.intervaloRefrescoSeg * 1000L)
-            val estabaArriba = listState.firstVisibleItemIndex == 0 &&
-                listState.firstVisibleItemScrollOffset == 0
-            val nuevos = viewModel.refrescarSilencioso()
-            if (nuevos > 0 && estabaArriba) listState.animateScrollToItem(0)
+    // Si la opción está activada (Ajustes) y estás arriba del todo, al crecer la
+    // lista (han llegado productos nuevos) salta a ellos para que los veas.
+    var tamPrevio by remember { mutableStateOf(productosFiltrados.size) }
+    LaunchedEffect(productosFiltrados.size) {
+        if (Ajustes.autoScrollNuevos &&
+            productosFiltrados.size > tamPrevio &&
+            listState.firstVisibleItemIndex == 0 &&
+            listState.firstVisibleItemScrollOffset == 0
+        ) {
+            listState.animateScrollToItem(0)
         }
+        tamPrevio = productosFiltrados.size
     }
 
     if (mostrarConfirmarBorrado) {

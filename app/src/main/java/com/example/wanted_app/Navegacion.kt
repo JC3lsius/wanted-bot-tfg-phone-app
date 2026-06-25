@@ -6,6 +6,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -66,6 +68,20 @@ fun AppPrincipal() {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val rutaActual = navBackStackEntry?.destination?.route
         val mostrarBarra = rutaActual != "login" && rutaActual != "registro"
+
+        // Auto-refresco GLOBAL: con sesión iniciada (fuera de login/registro), pide
+        // la lista nueva cada Ajustes.intervaloRefrescoSeg segundos AUNQUE no estés en
+        // la pantalla de productos, para que esté al día al volver. Se reinicia (con el
+        // nuevo intervalo) al aplicar un cambio o al cambiar de sesión.
+        val sesionActiva = rutaActual != null && rutaActual != "login" && rutaActual != "registro"
+        LaunchedEffect(sesionActiva, Ajustes.intervaloRefrescoSeg) {
+            if (sesionActiva) {
+                while (true) {
+                    delay(Ajustes.intervaloRefrescoSeg * 1000L)
+                    viewModel.refrescarSilencioso()
+                }
+            }
+        }
 
         val botonesBarra = listOf(
             BotonBarra(Icons.Default.Home, "inicio"),

@@ -188,6 +188,25 @@ fun PantallaConfigApp(onCerrarSesion: () -> Unit = {}) {
                         color = MaterialTheme.colorScheme.error
                     )
                 }
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider()
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = Ajustes.autoScrollNuevos,
+                        onCheckedChange = { Ajustes.fijarAutoScroll(it) }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Saltar a los productos nuevos", fontSize = 13.sp)
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "Si estás arriba del todo, mantiene la lista en los más recientes al llegar nuevos.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
 

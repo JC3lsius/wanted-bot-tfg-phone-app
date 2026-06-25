@@ -25,4 +25,12 @@ object Ajustes {
     fun fijarIntervalo(segundos: Int) {
         intervaloRefrescoSeg = segundos.coerceIn(INTERVALO_MIN, INTERVALO_MAX)
     }
+
+    /** Si al llegar productos nuevos y estar arriba del todo, la lista salta a ellos. */
+    var autoScrollNuevos by mutableStateOf(true)
+        private set
+
+    fun fijarAutoScroll(activo: Boolean) {
+        autoScrollNuevos = activo
+    }
 }
