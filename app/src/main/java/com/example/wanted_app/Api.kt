@@ -180,6 +180,16 @@ object RetrofitCliente {
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .callTimeout(15, TimeUnit.SECONDS)
+        // Adjunta el token JWT (si hay sesion iniciada) a TODAS las peticiones.
+        .addInterceptor { chain ->
+            val original = chain.request()
+            val peticion = Sesion.token?.let { token ->
+                original.newBuilder()
+                    .addHeader("Authorization", "Bearer $token")
+                    .build()
+            } ?: original
+            chain.proceed(peticion)
+        }
         .build()
 
     val api: ApiService by lazy {
