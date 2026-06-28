@@ -16,7 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.google.firebase.messaging.FirebaseMessaging
-
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -50,10 +51,21 @@ class MainActivity : ComponentActivity() {
     private fun obtenerTokenFCM() {
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (task.isSuccessful) {
-                Log.d("Wanted", "Token FCM: ${task.result}")
+                val token = task.result
+                Log.d("Wanted", "Token FCM: $token")
+                lifecycleScope.launch {
+                    try {
+                        RetrofitCliente.api.registrarDispositivo(DispositivoRequest(token))
+                        Log.d("Wanted", "Token registrado en el backend")
+                    } catch (e: Exception) {
+                        Log.w("Wanted", "No se pudo registrar el token", e)
+                    }
+                }
             } else {
                 Log.w("Wanted", "Error obteniendo token", task.exception)
             }
         }
     }
+
+
 }

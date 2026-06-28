@@ -7,6 +7,9 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MiFirebaseService : FirebaseMessagingService() {
 
@@ -41,5 +44,12 @@ class MiFirebaseService : FirebaseMessagingService() {
             .build()
 
         manager.notify(System.currentTimeMillis().toInt(), notificacion)
+    }
+
+    override fun onNewToken(token: String) {
+        super.onNewToken(token)
+        CoroutineScope(Dispatchers.IO).launch {
+            try { RetrofitCliente.api.registrarDispositivo(DispositivoRequest(token)) } catch (_: Exception) {}
+        }
     }
 }

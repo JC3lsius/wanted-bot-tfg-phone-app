@@ -44,6 +44,7 @@ data class StatsDto(
 
 // Auth
 data class LoginRequest(val email: String, val password: String)
+data class DispositivoRequest(@SerializedName("token_fcm") val tokenFcm: String)
 data class RegistroRequest(val email: String, val nombre: String, val password: String)
 data class TokenResponse(val token: String, val nombre: String, val email: String)
 
@@ -115,6 +116,9 @@ interface ApiService {
 
     @POST("auth/registro")
     suspend fun registro(@Body datos: RegistroRequest): TokenResponse
+
+    @POST("dispositivos")
+    suspend fun registrarDispositivo(@Body datos: DispositivoRequest): MensajeResponse
 
     // --- Búsquedas (Configuración del Bot) ---
 
