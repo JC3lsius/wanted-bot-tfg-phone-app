@@ -18,22 +18,30 @@ class MiFirebaseService : FirebaseMessagingService() {
 
         val titulo = message.data["nombre"] ?: message.notification?.title ?: "Nuevo producto"
         val cuerpo = message.data["precio"] ?: message.notification?.body ?: ""
+        // Leemos el producto_id AQUÍ, que es donde existe 'message':
+        val productoId = message.data["producto_id"] ?: System.currentTimeMillis().toString()
 
-        mostrarNotificacion(titulo, cuerpo)
+        mostrarNotificacion(titulo, cuerpo, productoId)
     }
 
-    private fun mostrarNotificacion(titulo: String, cuerpo: String) {
+    // Registra el token también cuando FCM lo rota (no solo al arrancar).
+    override fun onNewToken(token: String) {
+        super.onNewToken(token)
+        CoroutineScope(Dispatchers.IO).launch {
+            try { RetrofitCliente.api.registrarDispositivo(DispositivoRequest(token)) } catch (_: Exception) {}
+        }
+    }
+
+    private fun mostrarNotificacion(titulo: String, cuerpo: String, productoId: String) {
         val canalId = "productos_nuevos"
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val canal = NotificationChannel(
-                canalId,
-                "Productos nuevos",
-                NotificationManager.IMPORTANCE_HIGH
-            )
-            manager.createNotificationChannel(canal)
-        }
+        val canal = NotificationChannel(
+            canalId,
+            "Productos nuevos",
+            NotificationManager.IMPORTANCE_HIGH
+        )
+        manager.createNotificationChannel(canal)
 
         val notificacion = NotificationCompat.Builder(this, canalId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -43,13 +51,7 @@ class MiFirebaseService : FirebaseMessagingService() {
             .setAutoCancel(true)
             .build()
 
-        manager.notify(System.currentTimeMillis().toInt(), notificacion)
-    }
-
-    override fun onNewToken(token: String) {
-        super.onNewToken(token)
-        CoroutineScope(Dispatchers.IO).launch {
-            try { RetrofitCliente.api.registrarDispositivo(DispositivoRequest(token)) } catch (_: Exception) {}
-        }
+        // ID único y estable por producto → sin colisiones:
+        manager.notify(productoId.hashCode(), notificacion)
     }
 }
