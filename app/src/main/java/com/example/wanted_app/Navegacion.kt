@@ -50,10 +50,7 @@ private fun NavController.volverSeguro() {
 
 sealed class Pantalla(val ruta: String, val titulo: String, val icono: ImageVector) {
     object Inicio : Pantalla("inicio", "Inicio", Icons.Default.Home)
-    object Busquedas : Pantalla("busquedas", "Búsquedas", Icons.Default.Search)
     object Productos : Pantalla("productos", "Productos", Icons.Default.ShoppingCart)
-    object Favoritos : Pantalla("favoritos", "Favoritos", Icons.Default.Favorite)
-    object Perfil : Pantalla("perfil", "Perfil", Icons.Default.Person)
 }
 
 data class BotonBarra(val icono: ImageVector, val ruta: String)
