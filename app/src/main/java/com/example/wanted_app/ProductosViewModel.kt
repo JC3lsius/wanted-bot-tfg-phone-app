@@ -8,36 +8,35 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 
-class ProductosViewModel : ViewModel() {
+class ProductosViewModel(
+    // Por defecto usa el cliente real; en los tests le pasamos una API falsa.
+    private val api: ApiService = RetrofitCliente.api
+) : ViewModel() {
 
     private val _productos = mutableStateListOf<Producto>()
     val productos: List<Producto> get() = _productos
 
     val favoritos: List<Producto> get() = _productos.filter { it.esFavorito }
 
-    var cargando by mutableStateOf(false)        // carga inicial / refresco (página 1)
+    var cargando by mutableStateOf(false)
         private set
-    var cargandoMas by mutableStateOf(false)     // cargando la siguiente página
+    var cargandoMas by mutableStateOf(false)
         private set
     var error by mutableStateOf<String?>(null)
         private set
-    var hayMas by mutableStateOf(true)           // ¿quedan más páginas por cargar?
+    var hayMas by mutableStateOf(true)
         private set
 
     private var pagina = 1
     private val tamPagina = 30
 
-    init {
-        cargarProductos()
-    }
-
-    /** Carga la primera página y resetea la lista (al entrar a la pantalla o al refrescar). */
+    /** Carga la primera página y resetea la lista. */
     fun cargarProductos() {
         viewModelScope.launch {
             cargando = true
             error = null
             try {
-                val lista = RetrofitCliente.api.getProductos(pagina = 1, limite = tamPagina)
+                val lista = api.getProductos(pagina = 1, limite = tamPagina)
                 _productos.clear()
                 _productos.addAll(lista.map { it.aProducto() })
                 pagina = 1
@@ -57,9 +56,7 @@ class ProductosViewModel : ViewModel() {
             cargandoMas = true
             try {
                 val siguiente = pagina + 1
-                val lista = RetrofitCliente.api.getProductos(pagina = siguiente, limite = tamPagina)
-                // Si llegaron productos nuevos mientras paginabas, el offset se desplaza y
-                // algunos podrían repetirse: filtramos por id los que ya tenemos.
+                val lista = api.getProductos(pagina = siguiente, limite = tamPagina)
                 val nuevos = lista.map { it.aProducto() }
                     .filter { nuevo -> _productos.none { it.id == nuevo.id } }
                 _productos.addAll(nuevos)
@@ -73,16 +70,11 @@ class ProductosViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Refresco automático en segundo plano: trae la primera página y añade SOLO
-     * los productos nuevos (por id) al principio de la lista, sin vaciarla, sin
-     * spinner y sin mostrar error si falla. Devuelve cuántos se añadieron.
-     * Pensado para llamarse periódicamente desde la pantalla de productos.
-     */
+    /** Refresco silencioso: añade SOLO los nuevos (por id) al principio. Devuelve cuántos. */
     suspend fun refrescarSilencioso(): Int {
         if (cargando || cargandoMas) return 0
         return try {
-            val lista = RetrofitCliente.api.getProductos(pagina = 1, limite = tamPagina)
+            val lista = api.getProductos(pagina = 1, limite = tamPagina)
             val nuevos = lista.map { it.aProducto() }
                 .filter { nuevo -> _productos.none { it.id == nuevo.id } }
             if (nuevos.isNotEmpty()) _productos.addAll(0, nuevos)
@@ -98,14 +90,14 @@ class ProductosViewModel : ViewModel() {
             _productos[index] = _productos[index].copy(esFavorito = !_productos[index].esFavorito)
         }
         viewModelScope.launch {
-            try { RetrofitCliente.api.toggleFavorito(id) } catch (_: Exception) {}
+            try { api.toggleFavorito(id) } catch (_: Exception) {}
         }
     }
 
     fun descartar(id: String) {
         _productos.removeAll { it.id == id }
         viewModelScope.launch {
-            try { RetrofitCliente.api.descartar(id) } catch (_: Exception) {}
+            try { api.descartar(id) } catch (_: Exception) {}
         }
     }
 
@@ -113,7 +105,7 @@ class ProductosViewModel : ViewModel() {
     fun borrarTodos() {
         viewModelScope.launch {
             try {
-                RetrofitCliente.api.borrarProductos()
+                api.borrarProductos()
                 _productos.clear()
                 hayMas = false
             } catch (e: Exception) {
