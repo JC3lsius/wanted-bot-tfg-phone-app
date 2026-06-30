@@ -18,8 +18,9 @@ class MiFirebaseService : FirebaseMessagingService() {
 
         val titulo = message.data["nombre"] ?: message.notification?.title ?: "Nuevo producto"
         val cuerpo = message.data["precio"] ?: message.notification?.body ?: ""
-        // Leemos el producto_id AQUÍ, que es donde existe 'message':
         val productoId = message.data["producto_id"] ?: System.currentTimeMillis().toString()
+
+        android.util.Log.d("METRICA", "push_recibido producto=$productoId t_ms=${System.currentTimeMillis()}")  // <-- métrica
 
         mostrarNotificacion(titulo, cuerpo, productoId)
     }
