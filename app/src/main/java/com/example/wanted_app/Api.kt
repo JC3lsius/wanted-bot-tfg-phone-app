@@ -66,6 +66,7 @@ data class BusquedaDto(
     val tipo: String = "listener",
     val profundidad: Int = 1,
     @SerializedName("limite_productos") val limiteProductos: Int = 0,
+    @SerializedName("omitir_primera") val omitirPrimera: Boolean = true,
     val activa: Boolean = false,
     @SerializedName("estado_hilo") val estadoHilo: String = "detenido",
     @SerializedName("num_productos") val numProductos: Int = 0
@@ -84,7 +85,8 @@ data class BusquedaCrearRequest(
     val categoria: String = "",
     val tipo: String = "listener",
     val profundidad: Int = 1,
-    @SerializedName("limite_productos") val limiteProductos: Int = 0
+    @SerializedName("limite_productos") val limiteProductos: Int = 0,
+    @SerializedName("omitir_primera") val omitirPrimera: Boolean = true
 )
 
 // =====================================================================
