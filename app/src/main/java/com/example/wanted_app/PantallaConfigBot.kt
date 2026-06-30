@@ -55,6 +55,7 @@ fun PantallaConfigBot() {
     var tipo by remember { mutableStateOf("listener") }
     var profundidad by remember { mutableStateOf(1) }
     var limiteProductos by remember { mutableStateOf(0) }
+    var omitirPrimera by remember { mutableStateOf(true) }
     var busquedaLimpiar by remember { mutableStateOf<BusquedaDto?>(null) }
     var guardando by remember { mutableStateOf(false) }
     var avanzadasAbierto by remember { mutableStateOf(false) }
@@ -93,6 +94,7 @@ fun PantallaConfigBot() {
         tipo = "listener"
         profundidad = 1
         limiteProductos = 0
+        omitirPrimera = true
         avanzadasAbierto = false
     }
 
@@ -106,8 +108,9 @@ fun PantallaConfigBot() {
         tipo = b.tipo
         profundidad = b.profundidad
         limiteProductos = b.limiteProductos
+        omitirPrimera = b.omitirPrimera
         // Si trae opciones no básicas, abrimos avanzadas para que se vean.
-        avanzadasAbierto = (b.tipo != "listener" || b.profundidad != 1 || b.limiteProductos > 0)
+        avanzadasAbierto = (b.tipo != "listener" || b.profundidad != 1 || b.limiteProductos > 0 || !b.omitirPrimera)
     }
 
     LaunchedEffect(Unit) { recargar() }
@@ -130,7 +133,8 @@ fun PantallaConfigBot() {
                     busquedaLimpiar = null
                     scope.launch {
                         try {
-                            RetrofitCliente.api.borrarProductos(busqueda = objetivo.nombre)
+                            RetrofitCliente.api.borrarProductos(busquedaId = objetivo.id)
+                            recargar()
                         } catch (e: Exception) {
                             error = "No se pudieron borrar los productos: ${e.message}"
                         }
@@ -410,7 +414,7 @@ fun PantallaConfigBot() {
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 FilterChip(
                                     selected = tipo == "listener",
-                                    onClick = { tipo = "listener"; limiteProductos = 0 },
+                                    onClick = { tipo = "listener"; limiteProductos = 0; if (omitirPrimera) profundidad = 1 },
                                     label = { Text("Listener", fontSize = 12.sp) }
                                 )
                                 FilterChip(
@@ -427,6 +431,39 @@ fun PantallaConfigBot() {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
+                            // Solo en Listener: ¿avisar de lo ya publicado en la 1ª pasada
+                            // o solo de lo nuevo? Si se omite, la profundidad no aplica.
+                            if (tipo == "listener") {
+                                Spacer(Modifier.height(12.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            "Omitir productos de la primera búsqueda",
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            if (omitirPrimera)
+                                                "Solo avisa de lo nuevo a partir de ahora."
+                                            else
+                                                "Primero trae lo que ya hay (según la profundidad) y luego sigue avisando.",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                    Switch(
+                                        checked = omitirPrimera,
+                                        onCheckedChange = {
+                                            omitirPrimera = it
+                                            if (it) profundidad = 1
+                                        }
+                                    )
+                                }
+                            }
+
+                            // La profundidad se muestra en "Una vez" y en "Listener"
+                            // cuando NO se omiten los productos de la primera búsqueda.
+                            if (tipo == "once" || (tipo == "listener" && !omitirPrimera)) {
                             Spacer(Modifier.height(16.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
@@ -472,11 +509,12 @@ fun PantallaConfigBot() {
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                "Más profundidad = más resultados pero más lento. Solo se nota en el modo 'Una vez'.",
+                                "Más profundidad = más resultados, pero más lento.",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
+                            }   // <-- cierra el if de la Profundidad
                             // Límite de productos: solo tiene efecto en modo "Una vez".
                             if (tipo == "once") {
                                 Spacer(Modifier.height(16.dp))
@@ -535,7 +573,8 @@ fun PantallaConfigBot() {
                                 categoria = editando?.categoria ?: "",
                                 tipo = tipo,
                                 profundidad = profundidad,
-                                limiteProductos = limiteProductos
+                                limiteProductos = limiteProductos,
+                                omitirPrimera = omitirPrimera
                             )
                             val editandoActual = editando
                             scope.launch {
