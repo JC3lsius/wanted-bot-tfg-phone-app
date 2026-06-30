@@ -39,6 +39,7 @@ import coil.compose.AsyncImage
 import com.example.wanted_app.ui.theme.*
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.ui.platform.LocalContext
 
 data class PlataformaInfo(
     val nombre: String,
@@ -500,6 +501,7 @@ fun PantallaProductos(viewModel: ProductosViewModel) {
 
 @Composable
 fun TarjetaProductoNueva(producto: Producto, onDescartar: () -> Unit, onFavorito: () -> Unit, nombreBusqueda: String = "") {
+    val context = LocalContext.current
     val info = plataformas[producto.plataforma]
     var mostrarChat by remember { mutableStateOf(false) }
     var mostrarGaleria by remember { mutableStateOf(false) }
@@ -698,7 +700,10 @@ fun TarjetaProductoNueva(producto: Producto, onDescartar: () -> Unit, onFavorito
                         modifier = Modifier
                             .size(26.dp)
                             .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-                            .clickable { botonActivo = null },
+                            .clickable {
+                                botonActivo = null
+                                abrirProductoEnPlataforma(context, producto.enlace, producto.plataforma)
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         Text("i", fontSize = 12.sp, fontWeight = FontWeight.SemiBold,

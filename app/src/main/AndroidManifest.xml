@@ -35,4 +35,16 @@
             </intent-filter>
         </service>
     </application>
+    <!-- Para comprobar si las apps están instaladas y abrir sus enlaces (Android 11+) -->
+    <queries>
+        <package android:name="fr.vinted" />
+        <package android:name="com.wallapop" />
+        <package android:name="com.milanuncios" />
+        <package android:name="com.ebay.mobile" />
+
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
 </manifest>
